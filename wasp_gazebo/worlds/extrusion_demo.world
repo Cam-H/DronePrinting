@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <world name="default">
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <model name="wasp">
+      <pose>0 0 3 0 0 0</pose>
+      <link name='link'>
+        <visual name="vis">
+          <geometry>
+            <sphere>
+              <radius>0.1</radius>
+            </sphere>
+          </geometry>
+          <plugin name="unfoamer" filename="libwasp_gazebo.so"/>
+        </visual>
+        <visual name='cyl'>
+          <geometry>
+            <cylinder>
+              <radius>0.05</radius>
+              <length>0.8</length>
+            </cylinder>
+          </geometry>
+        </visual>
+      </link>
+      <static>1</static>
+    </model>
+  </world>
+</sdf>
