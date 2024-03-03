@@ -23,7 +23,9 @@ catkin_package(
     gazebo_ros
 )
 
-add_library(${PROJECT_NAME} src/FoamBuildPlugin.hh src/FoamBuildPlugin.cpp)
+include_directories(include)
+
+add_library(${PROJECT_NAME} src/FoamBuildPlugin.cpp)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
 
 ## System dependencies are found with CMake's conventions

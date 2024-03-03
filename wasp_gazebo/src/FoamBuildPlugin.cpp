@@ -1,4 +1,4 @@
-#include "FoamBuildPlugin.hh"
+#include "wasp_gazebo_plugin/FoamBuildPlugin.hh"
 
 
 using namespace gazebo;
@@ -9,7 +9,7 @@ FoamBuildPlugin::FoamBuildPlugin() : VisualPlugin(){}
 /////////////////////////////////////////////////
 FoamBuildPlugin::~FoamBuildPlugin(){}
 
-void FoamBuildPlugin::Load(rendering::VisualPtr _parent, sdf::ElementPtr /*_sdf*/) {
+void FoamBuildPlugin::Load(rendering::VisualPtr _parent, sdf::ElementPtr _sdf) {
     this->visual = _parent;
 
     ros::NodeHandle nh;
@@ -20,6 +20,22 @@ void FoamBuildPlugin::Load(rendering::VisualPtr _parent, sdf::ElementPtr /*_sdf*
         << "Load the Gazebo system plugin 'libgazebo_ros_api_plugin.so' in the gazebo_ros package)");
       return;
     }
+
+    do {
+      std::string name = _sdf->GetName();
+      if (name == "particleSize")
+        _sdf->GetValue()->Get(particleSize_);
+      else if (name == "growthFactor")
+        _sdf->GetValue()->Get(growthFactor_);
+      else if (name == "ejectSpeed")
+        _sdf->GetValue()->Get(ejectSpeed_);
+      else if (name == "bufferSize")
+        _sdf->GetValue()->Get(bufferSize_);
+      else
+        throw std::runtime_error("Invalid parameter for FoamBuildPlugin");
+
+      _sdf = _sdf->GetNextElement();
+    } while (_sdf);
 
     m_SubExtrusion = nh.subscribe<std_msgs::Bool>("wasp/extrusion", 10, &FoamBuildPlugin::extruder_cb, this);
     extruding = false;
@@ -52,26 +68,26 @@ void FoamBuildPlugin::OnUpdate() {
 
     // Check for collision with ground or other segments
     double t = -1;
-    bool hit = intersectSphereFoam(segments, wp.Pos(), F_RADIUS / GROWTH_FACTOR, ray, t);
-    if(!hit) hit = intersectSphereGround(wp.Pos(), F_RADIUS / GROWTH_FACTOR, ray, t);
+    bool hit = intersectSphereFoam(segments, wp.Pos(), particleSize_ / growthFactor_, ray, t);
+    if(!hit) hit = intersectSphereGround(wp.Pos(), particleSize_ / growthFactor_, ray, t);
 
     // Only create particle if there is a collision (Assumes linear path which otherwise introduces issues)
     if(hit){
       std::string name = "V" + std::to_string(j++);
-      std::cout << name << "\n";
+      // std::cout << name << "\n";
 
       rendering::VisualPtr vis = std::make_shared<rendering::Visual>(name, this->visual->GetScene());
       this->visual->GetScene()->AddVisual(vis);
 
-      vis->AttachObject(Spheres(name, (float)F_RADIUS, 0));
+      vis->AttachObject(Spheres(name, (float)particleSize_, 0));
 
-      vis->SetScale(ignition::math::Vector3d(1, 1, 1) / GROWTH_FACTOR);
+      vis->SetScale(ignition::math::Vector3d(1, 1, 1) / growthFactor_);
       vis->SetPose(wp);
 
       particles.push_back({vis, wp.Pos(), ray, 0, t});
     }
 
-      // std::cout << "VC" << this->visual->GetScene()->VisualCount() << " B" << k << " BUF" << buffer.size() << "/" << BUFFER_SIZE << " P" << particles.size() << "\n";
+      // std::cout << "VC" << this->visual->GetScene()->VisualCount() << " B" << k << " BUF" << buffer.size() << "/" << bufferSize_ << " P" << particles.size() << "\n";
   }
 
   // static float theta = 0, zz = -2.8; theta += IGN_PI / 256;
@@ -87,7 +103,7 @@ void FoamBuildPlugin::OnUpdate() {
     scale *= scale.X() > 1.0 ? 1.0 : 1.1;
     particles[i].vis->SetScale(scale);
 
-    particles[i].t = std::min(particles[i].tlim, particles[i].t + EXIT_SPEED);
+    particles[i].t = std::min(particles[i].tlim, particles[i].t + ejectSpeed_);
     ignition::math::Vector3d pos = particles[i].start + particles[i].ray * particles[i].t;
     particles[i].vis->SetPosition(pos);
 
@@ -100,7 +116,7 @@ void FoamBuildPlugin::OnUpdate() {
     }
   }
 
-  if(buffer.size() > BUFFER_SIZE){
+  if(buffer.size() > bufferSize_){
     std::vector<ignition::math::Vector3f> poses;
     for(const Particle& particle : buffer){
       particle.vis->Fini();// Remove old visuals
@@ -113,7 +129,7 @@ void FoamBuildPlugin::OnUpdate() {
     rendering::VisualPtr vis = std::make_shared<rendering::Visual>(name, this->visual->GetScene());
     this->visual->GetScene()->AddVisual(vis);
 
-    vis->AttachObject(Spheres(name, (float)F_RADIUS, 0, poses));
+    vis->AttachObject(Spheres(name, (float)particleSize_, 0, poses));
 
     buffer.clear();
   }
@@ -148,7 +164,7 @@ bool FoamBuildPlugin::intersectSphereFoam(const std::vector<ignition::math::Vect
       double temp = 0;
 
       ignition::math::Vector3d delta = origin - pos;
-      double r = F_RADIUS + radius;
+      double r = particleSize_ + radius;
       double c = delta.Dot(delta) - r * r;
       if(c < 0){
         t = 0;
