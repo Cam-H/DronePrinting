@@ -71,10 +71,10 @@ namespace gazebo {
         event::ConnectionPtr updateConnection;
         event::ConnectionPtr removeConnection;
 
-        const double EXIT_SPEED = 0.3;
-        const double F_RADIUS = 0.05;
-        const double GROWTH_FACTOR = 3.107;
-        const int BUFFER_SIZE = 500;
+        double particleSize_ = 0.05;
+        double growthFactor_ = 3.107;
+        double ejectSpeed_ = 0.3;
+        int bufferSize_ = 500;
 
         ros::Subscriber m_SubExtrusion;
         bool extruding;

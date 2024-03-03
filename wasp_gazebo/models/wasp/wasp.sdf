@@ -255,7 +255,9 @@
               <radius>0.01</radius>
             </sphere>
           </geometry>
-          <plugin name="foamer" filename="libwasp_gazebo.so"/>
+          <plugin name="foamer" filename="libwasp_gazebo.so">
+            <particleSize>30.0</particleSize>
+          </plugin>
         </visual>
       <gravity>1</gravity>
       <velocity_decay/>
