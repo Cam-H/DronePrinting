@@ -61,7 +61,6 @@ find_package(catkin REQUIRED COMPONENTS
 # Generate services in the 'srv' folder
 add_service_files(
   FILES
-  NextPose.srv
   RequestMission.srv
 )
 
@@ -123,14 +122,9 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
-
-## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/offb_node.cpp
-# )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -140,17 +134,13 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(wasp_control src/SetpointControl.h src/SetpointControl.cpp)
+add_executable(wasp_control src/SetpointControl.cpp)
 target_link_libraries(wasp_control ${catkin_LIBRARIES})
 add_dependencies(wasp_control wasp_description_gencpp)
 
-add_executable(mission_server src/mission_server.cpp)
+add_executable(mission_server src/MissionServer.cpp)
 target_link_libraries(mission_server ${catkin_LIBRARIES})
 add_dependencies(mission_server wasp_description_gencpp)
-
-add_executable(mission_test src/mission_test.cpp)
-target_link_libraries(mission_test ${catkin_LIBRARIES})
-add_dependencies(mission_test wasp_description_gencpp)
 
 add_executable(extruder src/extruder)
 target_link_libraries(extruder ${catkin_LIBRARIES})
