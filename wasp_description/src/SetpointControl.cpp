@@ -1,4 +1,6 @@
-#include "SetpointControl.h"
+#include "wasp_description/SetpointControl.h"
+
+#include "wasp_description/WaspUtils.h"
 
 mavros_msgs::State current_state;
 void state_cb(const mavros_msgs::State::ConstPtr& msg){
@@ -29,7 +31,7 @@ int main(int argc, char **argv){
     ROS_INFO("FCU Connection successful");
 
     // Send a few setpoints before starting
-    for(int i = 3; ros::ok() && i > 0; --i){
+    for(int i = 0; ros::ok() && i < 10; i++){
         sc.publish();
         ros::spinOnce();
         rate.sleep();
@@ -65,7 +67,7 @@ SetpointControl::SetpointControl(ros::NodeHandle nh) : m_Mode(Mode::DISARM){
     m_ArmingClient = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
     m_SetModeClient = nh.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
 
-    m_Client = nh.serviceClient<wasp_description::RequestMission>("request_mission");
+    m_MissionClient = nh.serviceClient<wasp_description::RequestMission>("request_mission");
 
     m_WPPushClient = nh.serviceClient<mavros_msgs::WaypointPush>("mavros/mission/push");
     m_WPClearClient = nh.serviceClient<mavros_msgs::WaypointClear>("mavros/mission/clear");
@@ -73,6 +75,10 @@ SetpointControl::SetpointControl(ros::NodeHandle nh) : m_Mode(Mode::DISARM){
 
     m_Ready = m_InProcess = false;
     // monitor();
+}
+
+void SetpointControl::loadParameters(){
+    ros::param::param <int>("~flighttime", m_BaseFlightTime, 300);
 }
 
 void SetpointControl::local_pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg){
@@ -161,11 +167,18 @@ void SetpointControl::update(){
     // if(m_Mode == Mode::DISARM){
     //     return;
     // }
+    std::string mode = "MANUAL";
+    switch(m_Mode){
+        case Mode::PRINTING:
+            mode = "AUTO.MISSION";
+            break;
+        case Mode::POSITION: case Mode::VELOCITY: case Mode::ACCELERATION:
+            mode = "OFFBOARD";
+            break;
+    }
 
     mavros_msgs::SetMode set_mode;
-    std::string mode = m_Mode == Mode::PRINTING ? "AUTO.MISSION" : "OFFBOARD";
     set_mode.request.custom_mode = mode;
-
     mavros_msgs::CommandBool arm_cmd;
     arm_cmd.request.value = true;
 
@@ -181,13 +194,6 @@ void SetpointControl::update(){
             }
 
             last_request = ros::Time::now();
-        }
-    }
-
-
-    if(m_Mode == Mode::PRINTING){
-        if(m_WaypointCount > 0){
-            m_InProcess = m_LastWaypoint > 1 && m_LastWaypoint < m_WaypointCount - 1;// In process correlates to extruding state
         }
     }
 
@@ -221,18 +227,24 @@ void SetpointControl::swapMode(const std::string& str){
 }
 
 void SetpointControl::reqMission(){
+
+    mavros_msgs::WaypointClear clrsrv;
+    if(!m_WPClearClient.call(clrsrv) || !clrsrv.response.success){
+        ROS_WARN("Failed to clear old waypoints");
+        return;
+    }
+
     wasp_description::RequestMission srv;
-    srv.request.flighttime = 1000;//TODO get an actually appropriate number
-    if(m_Client.call(srv)){
+    srv.request.flighttime = m_BaseFlightTime;//TODO get an actually appropriate number
+    if(m_MissionClient.call(srv)){
         m_WaypointCount = srv.response.waypoints.size();
         m_LastWaypoint = 0;
 
+        m_WaypointCtrl = srv.response.ctrl;
+        m_WaypointCtrlIdx = 0;
+
         if(!srv.response.waypoints.empty()){
             std::cout << srv.response.waypoints.size() << "\n";
-
-            mavros_msgs::WaypointClear clrsrv;
-            if(m_WPClearClient.call(clrsrv) && !clrsrv.response.success) return;
-            ROS_INFO("Old waypoints successfully cleared");
 
             mavros_msgs::WaypointPush pushsrv;
             pushsrv.request.start_index = 0;
@@ -292,17 +304,5 @@ bool SetpointControl::isReady(){
 
 bool SetpointControl::inProcess(){
     return m_InProcess;
-}
-
-bool SetpointControl::isNum(const std::string& str){
-    std::string::const_iterator it = str.begin();
-    while (it != str.end() && (std::isdigit(*it) || (it == str.begin() && *it == '-') || *it == ' ' || *it == '.')) ++it;
-    return !str.empty() && it == str.end();
-}
-
-void SetpointControl::updateField(std::string value, double& field){
-    if(isNum(value)){
-        field = std::stod(value);
-    }
 }
 

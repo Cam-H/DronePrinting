@@ -75,6 +75,7 @@ namespace gazebo {
         double growthFactor_ = 3.107;
         double ejectSpeed_ = 0.3;
         int bufferSize_ = 500;
+        bool useROS_ = true;
 
         ros::Subscriber m_SubExtrusion;
         bool extruding;

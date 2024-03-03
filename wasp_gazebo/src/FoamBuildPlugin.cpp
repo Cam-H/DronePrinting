@@ -1,6 +1,5 @@
 #include "wasp_gazebo_plugin/FoamBuildPlugin.hh"
 
-
 using namespace gazebo;
 GZ_REGISTER_VISUAL_PLUGIN(FoamBuildPlugin)
 
@@ -12,14 +11,7 @@ FoamBuildPlugin::~FoamBuildPlugin(){}
 void FoamBuildPlugin::Load(rendering::VisualPtr _parent, sdf::ElementPtr _sdf) {
     this->visual = _parent;
 
-    ros::NodeHandle nh;
-
-    if (!ros::isInitialized())
-    {
-      ROS_FATAL_STREAM("A ROS node for Gazebo has not been initialized, unable to load plugin. "
-        << "Load the Gazebo system plugin 'libgazebo_ros_api_plugin.so' in the gazebo_ros package)");
-      return;
-    }
+    _sdf = _sdf->GetFirstElement();
 
     do {
       std::string name = _sdf->GetName();
@@ -31,14 +23,30 @@ void FoamBuildPlugin::Load(rendering::VisualPtr _parent, sdf::ElementPtr _sdf) {
         _sdf->GetValue()->Get(ejectSpeed_);
       else if (name == "bufferSize")
         _sdf->GetValue()->Get(bufferSize_);
+      else if (name == "useROS")
+        _sdf->GetValue()->Get(useROS_);
+      else if (name == "robotNamespace")
+        break;
       else
         throw std::runtime_error("Invalid parameter for FoamBuildPlugin");
 
       _sdf = _sdf->GetNextElement();
     } while (_sdf);
 
-    m_SubExtrusion = nh.subscribe<std_msgs::Bool>("wasp/extrusion", 10, &FoamBuildPlugin::extruder_cb, this);
-    extruding = false;
+    if(useROS_){
+      ros::NodeHandle nh;
+
+      if (!ros::isInitialized())
+      {
+        ROS_FATAL_STREAM("A ROS node for Gazebo has not been initialized, unable to load plugin. "
+          << "Load the Gazebo system plugin 'libgazebo_ros_api_plugin.so' in the gazebo_ros package)");
+        return;
+      }
+
+      m_SubExtrusion = nh.subscribe<std_msgs::Bool>("wasp/extrusion", 10, &FoamBuildPlugin::extruder_cb, this);
+    }
+
+    extruding = !useROS_;
 
     // Listen to the update event. This event is broadcast every simulation iteration.
     this->updateConnection = event::Events::ConnectRender(std::bind(&FoamBuildPlugin::OnUpdate, this));

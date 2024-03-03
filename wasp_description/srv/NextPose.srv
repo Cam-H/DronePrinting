@@ -1,3 +1,0 @@
-int64 a
----
-geometry_msgs/Vector3 pos
