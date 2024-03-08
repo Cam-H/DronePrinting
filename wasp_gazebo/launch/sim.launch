@@ -14,6 +14,7 @@
     <arg name="vehicle" default="wasp"/>
     <arg name="world" default="$(find wasp_gazebo)/worlds/empty.world"/>
     <arg name="sdf" default="$(find wasp_gazebo)/models/$(arg vehicle)/$(arg vehicle).sdf"/>
+<!--     <arg name="sdf" default="$(find wasp_gazebo)/urdf/tt.sdf"/> -->
 
     <!-- gazebo configs -->
     <arg name="gui" default="true"/>
@@ -28,8 +29,7 @@
 
     <arg unless="$(arg interactive)" name="px4_command_arg1" value="-d"/>
     <arg     if="$(arg interactive)" name="px4_command_arg1" value=""/>
-    <node name="sitl" pkg="px4" type="px4" output="screen"
-        args="$(find px4)/build/px4_sitl_default/etc -s etc/init.d-posix/rcS $(arg px4_command_arg1)" required="true"/>
+    <node name="sitl" pkg="px4" type="px4" output="screen" args="$(find px4)/build/px4_sitl_default/etc -s etc/init.d-posix/rcS $(arg px4_command_arg1)" required="true"/>
 
     <!-- MAVROS configs -->
     <arg name="fcu_url" default="udp://:14540@localhost:14557"/>
@@ -37,7 +37,6 @@
 
     <!-- MAVROS -->
     <include file="$(find wasp_description)/launch/px4.launch">
-        <!-- GCS link is provided by SITL -->
         <arg name="fcu_url" value="$(arg fcu_url)"/>
         <arg name="respawn_mavros" value="$(arg respawn_mavros)"/>
     </include>
@@ -53,6 +52,10 @@
     </include>
 
     <!-- gazebo model -->
-    <node name="$(anon vehicle_spawn)" pkg="gazebo_ros" type="spawn_model" output="screen" args="-sdf -file $(arg sdf) -model $(arg vehicle) -x $(arg x) -y $(arg y) -z $(arg z) -R $(arg R) -P $(arg P) -Y $(arg Y)"/>
+<!--     <node name="$(anon vehicle_spawn)" pkg="gazebo_ros" type="spawn_model" output="screen" args="-sdf -file $(arg sdf) -model $(arg vehicle) -x $(arg x) -y $(arg y) -z $(arg z) -R $(arg R) -P $(arg P) -Y $(arg Y)"/> -->
+
+    <arg name="model" default="$(find wasp_gazebo)/urdf/drone.urdf.xacro"/>
+    <param name="robot_description" command="$(find xacro)/xacro $(arg model)" />
+    <node name="$(anon vehicle_spawn)" pkg="gazebo_ros" type="spawn_model" output="screen" args="-urdf -model $(arg vehicle) -param robot_description -x $(arg x) -y $(arg y) -z $(arg z) -R $(arg R) -P $(arg P) -Y $(arg Y)" />
 
 </launch>
