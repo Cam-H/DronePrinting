@@ -6,7 +6,16 @@
   <arg name="gui" default="true"/>
   <arg name="headless" default="false"/>
   <arg name="debug" default="false"/>
-  <arg name="model" default="$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro"/>
+  <arg name="model" default="$(find wasp_gazebo)/urdf/drone.urdf.xacro"/>
+
+    <arg name="vehicle" default="wasp"/>
+    <arg name="sdf" default="$(find wasp_gazebo)/models/$(arg vehicle)/$(arg vehicle).sdf"/>
+    <arg name="x" default="0"/>
+    <arg name="y" default="0"/>
+    <arg name="z" default="0"/>
+    <arg name="R" default="0"/>
+    <arg name="P" default="0"/>
+    <arg name="Y" default="0"/>
 
   <!-- robot description to load in rviz or gazebo -->
   <param name="robot_description" command="$(find xacro)/xacro $(arg model)" />
@@ -14,6 +23,7 @@
   <!-- We resume the logic in empty_world.launch, changing only the name of the world to be launched -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="debug" value="$(arg debug)" />
+    <arg name="verbose" value="true" />
     <arg name="gui" value="$(arg gui)" />
     <arg name="paused" value="$(arg paused)"/>
     <arg name="use_sim_time" value="$(arg use_sim_time)"/>
@@ -22,5 +32,31 @@
 
   <!-- push robot_description to factory and spawn robot in gazebo -->
   <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model"
-        args="-z 1.0 -unpause -urdf -model robot -param robot_description" respawn="false" output="screen" />
+        args="-z 1.0 -unpause -urdf -model $(arg vehicle) -param robot_description" respawn="false" output="screen" />
+
+    <!-- push robot_description to factory and spawn robot in gazebo -->
+<!--    <node name="$(anon vehicle_spawn)" pkg="gazebo_ros" type="spawn_model" output="screen" args="-sdf -file $(arg sdf) -model $(arg vehicle) -x $(arg x) -y $(arg y) -z $(arg z) -R $(arg R) -P $(arg P) -Y $(arg Y)"/>-->
 </launch>
+
+<!--<launch>
+
+  <arg name="paused" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="gui" default="true"/>
+  <arg name="headless" default="false"/>
+  <arg name="debug" default="false"/>
+  <arg name="model" default="$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro"/>
+
+  <param name="robot_description" command="$(find xacro)/xacro $(arg model)" />
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="gui" value="$(arg gui)" />
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    <arg name="headless" value="$(arg headless)"/>
+  </include>
+
+  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model"
+        args="-z 1.0 -unpause -urdf -model robot -param robot_description" respawn="false" output="screen" />
+</launch>-->

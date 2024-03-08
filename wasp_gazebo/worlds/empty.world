@@ -34,6 +34,26 @@
       <magnetic_field>6.0e-6 2.3e-5 -4.2e-5</magnetic_field>
     </physics>
 
+    <model name="outline">
+      <pose>2.5 7.5 0 0 0 0</pose>
+      <link name='link'>
+        <visual name="base">
+          <geometry>
+            <box>
+              <size>5 5 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <name>Gazebo/Orange</name>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+            </script>
+        </material>
+        </visual>
+      </link>
+      <static>true</static>
+    </model>
+
 <!--    <plugin name='wind_plugin' filename='libgazebo_wind_plugin.so'>
       <frameId>base_link</frameId>
       <robotNamespace/>
