@@ -62,6 +62,10 @@ SetpointControl::SetpointControl(ros::NodeHandle nh) : m_Mode(Mode::DISARM){
     m_PubLocalPose = nh.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
     m_PubLocalVel = nh.advertise<geometry_msgs::Twist>("mavros/setpoint_velocity/cmd_vel_unstamped", 10);
 
+    m_SubOdom = nh.subscribe<nav_msgs::Odometry>("wasp/vio/odom", 10, &SetpointControl::odom_cb, this);
+    m_PubOdom = nh.advertise<nav_msgs::Odometry>("mavros/odometry/out", 10);
+    m_PubVIOState = nh.advertise<mavros_msgs::CompanionProcessStatus>("mavros/companion_process/status", 10);
+
     m_PubExtrusion = nh.advertise<std_msgs::Bool>("wasp/extrusion", 10);
 
     m_ArmingClient = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
@@ -109,6 +113,21 @@ void SetpointControl::waypoint_reached_cb(const mavros_msgs::WaypointReached::Co
     if(m_LastWaypoint == m_WaypointCount){
         ROS_INFO("Mission complete. Disarming drone");
         m_Mode = Mode::DISARM;
+    }
+}
+
+void SetpointControl::odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
+    mavros_msgs::CompanionProcessStatus cmsg;
+    cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_ACTIVE;
+    cmsg.component = mavros_msgs::CompanionProcessStatus::MAV_COMP_ID_VISUAL_INERTIAL_ODOMETRY;
+    m_PubVIOState.publish(cmsg);
+
+    nav_msgs::Odometry tmsg = *msg;
+    tmsg.child_frame_id = "base_link";
+    m_PubOdom.publish(tmsg);
+
+    if(m_InProcess){
+        std::cout << tmsg.pose.pose.position.x << " "<< tmsg.pose.pose.position.y << " " << tmsg.pose.pose.position.z << "\n";
     }
 }
 
@@ -296,6 +315,11 @@ void SetpointControl::publish(){
     std_msgs::Bool val;
     val.data = m_InProcess;
     m_PubExtrusion.publish(val);
+
+    // nav_msgs::Odometry odo;
+    // odo.child_frame_id = "base_link";
+    // m_PubOdom.publish(odo);
+    // std::cout << "x\n";
 }
 
 bool SetpointControl::isReady(){

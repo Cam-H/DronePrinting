@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 
+#include <mavros_msgs/CompanionProcessStatus.h>
 #include <mavros_msgs/CommandHome.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
@@ -90,6 +91,7 @@ private:
 
     ros::Subscriber m_SubOdom;
     ros::Publisher m_PubOdom;
+    ros::Publisher m_PubVIOState;
 
     ros::Publisher m_PubActuator;
     double gm;
