@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<launch>
+
+<!--     <include file="$(find wasp_description)/launch/vio.launch"/> -->
+
+    <!-- PX4 configs -->
+    <arg name="fcu_url" default="udp://:14550@localhost@5760" />
+    <arg name="gcs_url" default=""/>
+    <arg name="respawn_mavros" default="true"/>
+
+    <!-- MAVROS -->
+    <include file="$(find mavros)/launch/px4.launch">
+        <!-- GCS link is provided by SITL -->
+<!--        <arg name="gcs_url" value=""/>
+        <arg name="fcu_url" value="$(arg fcu_url)"/>
+        <arg name="respawn_mavros" value="$(arg respawn_mavros)"/>-->
+
+<!--         <remap from="/mavros/odometry/out" to="vio/odom"/> -->
+
+    </include>
+
+    <!-- gazebo configs -->
+    <arg name="world" default="$(find wasp_gazebo)/worlds/empty.world"/>
+    <arg name="gui" default="true"/>
+    <arg name="debug" default="false"/>
+    <arg name="verbose" default="false"/>
+    <arg name="paused" default="false"/>
+    <arg name="respawn_gazebo" default="false"/>
+
+    <!-- Gazebo sim -->
+    <include file="$(find wasp_gazebo)/launch/gazebo.launch">
+        <arg name="gui" value="$(arg gui)"/>
+        <arg name="world" value="$(arg world)"/>
+        <arg name="debug" value="$(arg debug)"/>
+        <arg name="verbose" value="$(arg verbose)"/>
+        <arg name="paused" value="$(arg paused)"/>
+        <arg name="respawn_gazebo" value="$(arg respawn_gazebo)"/>
+    </include>
+
+</launch>

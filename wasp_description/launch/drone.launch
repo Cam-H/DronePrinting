@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 
-    <include file="$(find wasp_description)/launch/vio.launch"/>
+<!--     <include file="$(find wasp_description)/launch/vio.launch"/> -->
 
     <!-- PX4 configs -->
     <arg name="fcu_url" default="udp://:14550@localhost@5760" />
@@ -10,9 +10,9 @@
 
     <!-- MAVROS -->
     <include file="$(find mavros)/launch/px4.launch">
+        <arg name="fcu_url" value="$(arg fcu_url)"/>
         <!-- GCS link is provided by SITL -->
 <!--        <arg name="gcs_url" value=""/>
-        <arg name="fcu_url" value="$(arg fcu_url)"/>
         <arg name="respawn_mavros" value="$(arg respawn_mavros)"/>-->
 
 <!--         <remap from="/mavros/odometry/out" to="vio/odom"/> -->

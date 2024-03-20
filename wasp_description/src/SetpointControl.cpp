@@ -26,6 +26,9 @@ int main(int argc, char **argv){
     while(ros::ok() && !current_state.connected){
         ros::spinOnce();
         rate.sleep();
+
+                sc.publish();
+
     }
 
     ROS_INFO("FCU Connection successful");
@@ -276,7 +279,7 @@ void SetpointControl::reqMission(){
 }
 
 void SetpointControl::publish(){
-    if(!isReady()){
+    if(!isReady() && false){
         ROS_WARN("Not yet ready, did not publish setpoint");
         return;
     }
