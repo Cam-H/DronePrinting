@@ -1,6 +1,5 @@
 #include <ros/ros.h>
 
-#include <mavros_msgs/CompanionProcessStatus.h>
 #include <mavros_msgs/CommandHome.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
@@ -17,9 +16,6 @@
 
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
-
-#include <nav_msgs/Odometry.h>
-
 
 #include <std_msgs/Bool.h>
 
@@ -61,7 +57,6 @@ private:
 
     void waypoint_reached_cb(const mavros_msgs::WaypointReached::ConstPtr& msg);
 
-    void odom_cb(const nav_msgs::Odometry::ConstPtr& msg);
 private:
 
     Mode m_Mode;
@@ -88,10 +83,6 @@ private:
     uint32_t m_LastWaypoint;
 
     int m_BaseFlightTime;
-
-    ros::Subscriber m_SubOdom;
-    ros::Publisher m_PubOdom;
-    ros::Publisher m_PubVIOState;
 
     ros::Publisher m_PubActuator;
     double gm;

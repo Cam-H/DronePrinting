@@ -7,15 +7,18 @@
   <arg name="fixed_frame_id" default="world"/>
   <arg name="calibration_file" default="$(find wasp_description)/config/camchain-imucam-wasp.yaml"/>
 
+  <arg name="report" default="false"/>
+
   <!-- Image Processor Nodelet  -->
   <include file="$(find wasp_description)/launch/image_processor.launch">
     <arg name="robot" value="$(arg robot)"/>
     <arg name="calibration_file" value="$(arg calibration_file)"/>
   </include>
 
-  <!-- Msckf Vio Nodelet  -->
   <group ns="$(arg robot)">
-    <node pkg="nodelet" type="nodelet" name="vio" args='standalone msckf_vio/MsckfVioNodelet' output="screen">
+
+    <!-- Msckf Vio Nodelet  -->
+    <node pkg="nodelet" type="nodelet" name="vio" args='standalone msckf_vio/MsckfVioNodelet'>
 
       <!-- Calibration parameters -->
       <rosparam command="load" file="$(arg calibration_file)"/>
@@ -54,8 +57,13 @@
 
       <remap from="~imu" to="/camera/imu"/>
       <remap from="~features" to="image_processor/features"/>
+    </node>
 
+    <!-- Vio to MAVROS Interface Node  -->
+    <node pkg="wasp_description" type="wasp_vio" name="vio_interface" output="screen">
+      <param name="report" value="$(arg report)" />
     </node>
   </group>
+
 
 </launch>
