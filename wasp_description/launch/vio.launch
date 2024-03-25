@@ -4,7 +4,7 @@
   <include file="$(find wasp_description)/launch/camera.launch"/>
 
   <arg name="robot" default="wasp"/>
-  <arg name="fixed_frame_id" default="world"/>
+  <arg name="fixed_frame_id" default="camera_link"/>
   <arg name="calibration_file" default="$(find wasp_description)/config/camchain-imucam-wasp.yaml"/>
 
   <arg name="report" default="false"/>

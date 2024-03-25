@@ -39,7 +39,6 @@ void VIOInterface::odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
     m_PubVIOState.publish(cmsg);
 
     nav_msgs::Odometry tmsg = *msg;
-    tmsg.child_frame_id = "base_link";
     m_PubOdom.publish(tmsg);
 
     geometry_msgs::PoseWithCovarianceStamped vmsg;

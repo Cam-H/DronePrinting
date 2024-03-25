@@ -15,11 +15,9 @@
     <arg name="respawn_mavros" default="false"/>
 
     <!-- MAVROS -->
-    <include file="$(find wasp_description)/launch/px4.launch">
+    <include file="$(find mavros)/launch/px4.launch">
         <arg name="fcu_url" value="$(arg fcu_url)"/>
         <arg name="respawn_mavros" value="$(arg respawn_mavros)"/>
-
-        <remap from="/mavros/odometry/out" to="wasp/vio/odom"/>
     </include>
 
     <!-- gazebo configs -->
