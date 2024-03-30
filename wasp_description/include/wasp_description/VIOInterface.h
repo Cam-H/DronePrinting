@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 
+
 #include <mavros_msgs/CompanionProcessStatus.h>
 
 #include <geometry_msgs/PoseStamped.h>
@@ -8,7 +9,7 @@
 
 #include <nav_msgs/Odometry.h>
 
-
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -30,5 +31,12 @@ private:
     ros::Publisher m_PubOdom2;
     ros::Publisher m_PubVIOState;
 
+    int m_FeatureCount;
+
     bool m_ReportOdometry;
+    int m_TerminationLimit;
+    int m_CriticalLimit;
+
+    double m_Timeout;
+    std::chrono::time_point<std::chrono::steady_clock> m_LastPostTime;
 };

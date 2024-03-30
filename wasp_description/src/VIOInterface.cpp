@@ -19,10 +19,14 @@ int main(int argc, char **argv){
 }
 
 VIOInterface::VIOInterface(ros::NodeHandle nh){
-    m_SubOdom = nh.subscribe<nav_msgs::Odometry>("vio/odom", 10, &VIOInterface::odom_cb, this);
+    m_SubOdom = nh.subscribe<nav_msgs::Odometry>("/wasp/vio/odom", 10, &VIOInterface::odom_cb, this);
     m_PubOdom = nh.advertise<nav_msgs::Odometry>("/mavros/odometry/out", 10);
     m_PubOdom2 = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/mavros/vision/pose_cov", 10);
     m_PubVIOState = nh.advertise<mavros_msgs::CompanionProcessStatus>("/mavros/companion_process/status", 10);
+
+    m_FeatureCount = 0;
+
+    m_LastPostTime = std::chrono::steady_clock::now();
 
     loadParameters();
 }
@@ -30,31 +34,50 @@ VIOInterface::VIOInterface(ros::NodeHandle nh){
 void VIOInterface::loadParameters(){
     ros::param::param <bool>("~report", m_ReportOdometry, false);
 
+    ros::param::param <int>("~term_limit", m_TerminationLimit, 8);
+    ros::param::param <int>("~critical_limit", m_CriticalLimit, 20);
+    if(m_CriticalLimit < m_TerminationLimit) m_CriticalLimit = m_TerminationLimit;
+
+    ros::param::param <double>("~timeout", m_Timeout, 0.5);
 }
 
 void VIOInterface::odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
-    mavros_msgs::CompanionProcessStatus cmsg;
-    cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_ACTIVE;
-    cmsg.component = mavros_msgs::CompanionProcessStatus::MAV_COMP_ID_VISUAL_INERTIAL_ODOMETRY;
-    m_PubVIOState.publish(cmsg);
+
+
+    m_LastPostTime = std::chrono::steady_clock::now();
 
     nav_msgs::Odometry tmsg = *msg;
     m_PubOdom.publish(tmsg);
 
-    geometry_msgs::PoseWithCovarianceStamped vmsg;
-    vmsg.pose = tmsg.pose;
-    m_PubOdom2.publish(vmsg);
+    // geometry_msgs::PoseWithCovarianceStamped vmsg;
+    // vmsg.pose = tmsg.pose;
+    // m_PubOdom2.publish(vmsg);
 
     if(m_ReportOdometry){
         std::string pos = "Odometry Position: [" + std::to_string(tmsg.pose.pose.position.x) + ", " +
                                                    std::to_string(tmsg.pose.pose.position.y) + ", " +
                                                    std::to_string(tmsg.pose.pose.position.z) + "]\n";
-        // ROS_INFO(pos.c_str());
         std::cout << pos;
-
     }
 }
 
 void VIOInterface::publish(){
+    mavros_msgs::CompanionProcessStatus cmsg;
+    cmsg.component = mavros_msgs::CompanionProcessStatus::MAV_COMP_ID_VISUAL_INERTIAL_ODOMETRY;
+    cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_FLIGHT_TERMINATION;
 
+    const std::chrono::duration<double> elapsed_seconds{std::chrono::steady_clock::now() - m_LastPostTime};
+
+    if(elapsed_seconds.count() > m_Timeout){
+        ROS_WARN("VIO Timeout. No Odometry received");
+    } else {
+        // if(m_FeatureCount > m_CriticalLimit){
+        //     cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_ACTIVE;
+        // }else if(m_FeatureCount > m_TerminationLimit){
+        //     cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_CRITICAL;
+        // }
+        cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_ACTIVE;
+    }
+
+    m_PubVIOState.publish(cmsg);
 }

@@ -31,7 +31,7 @@
   <link name="base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0.00158 0.00084 -0.06501"/>
-      <mass value="3.67"/>
+      <mass value="4.121"/>
       <inertia ixx="0.03" ixy="0.0" ixz="0.0" iyy="0.032" iyz="0.0" izz="0.0050"/>
     </inertial>
     <!--
@@ -474,15 +474,15 @@
       </axis>
     </joint>
     <!-- Comment this section to disable GPS -->
-    <!--    <include>
+    <include>
       <uri>model://gps</uri>
       <pose>0 0 0 0 0 0</pose>
       <name>gps</name>
     </include>
-    <joint name='gps_joint' type='fixed'>
+    <joint name="gps_joint" type="fixed">
       <child>gps::link</child>
       <parent>base_link</parent>
-    </joint>-->
+    </joint>
     <plugin filename="libgazebo_multirotor_base_plugin.so" name="rosbag">
       <robotNamespace/>
       <linkName>base_link</linkName>

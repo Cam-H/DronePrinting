@@ -1,10 +1,14 @@
 <?xml version="1.0"?>
 <launch>
 
+    <arg name="vio" default="true" />
+
     <!-- PX4 configs -->
     <arg name="fcu_url" default="/dev/ttyACM0:57600" />
     <arg name="gcs_url" default="udp://@$(env MASTER_IP)"/>
     <arg name="respawn_mavros" default="true"/>
+
+<!--     <node pkg="wasp_description" type="setup.sh" name="wasp_setup" /> -->
 
     <!-- MAVROS -->
     <include file="$(find mavros)/launch/px4.launch">
@@ -13,6 +17,7 @@
         <arg name="respawn_mavros" value="$(arg respawn_mavros)"/>
     </include>
 
-<!--     <include file="$(find wasp_description)/launch/vio.launch"/> -->
-
+    <group if="$(arg vio)">
+        <include file="$(find wasp_description)/launch/vio.launch"/>
+    </group>
 </launch>

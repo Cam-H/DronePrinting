@@ -7,7 +7,7 @@ int main(int argc, char **argv){
     Extruder extruder(nh);
 
     //the setpoint publishing rate MUST be faster than 2Hz
-    ros::Rate rate(20.0);
+    ros::Rate rate(100.0);
 
     while(ros::ok()){
       extruder.publish();
@@ -35,16 +35,19 @@ void Extruder::extrusion_cb(const std_msgs::Bool::ConstPtr& msg){
 void Extruder::publish(){
   static float t = 0;
 
-  mavros_msgs::ActuatorControl val;
-  val.group_mix = 2;
+  for(int j = 1; j < 4; j++){
+      mavros_msgs::ActuatorControl val;
+  val.group_mix = j;
 
   for(int i = 0; i < 8; i++){
-    val.controls[i] = abs(cos(t));
+    val.controls[i] = cos(t);
   }
 
   m_PubExtrusion.publish(val);
+  }
 
-    std::cout << t << " -> " << abs(cos(t)) << " za\n";
+
+    std::cout << t << " -> " << cos(t) << " za\n";
 
   t += 0.05;
 

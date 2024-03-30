@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+
+    <node pkg="wasp_description" type="setup.sh" name="server_setup" output="screen">
+        <param name="device_id" type="string" value="3120zzzzzzzzzzzzz" />
+    </node>
+
+<!--     <node pkg="wasp_description" type="mission_server" name="server" output="screen"> -->
+
+</launch>

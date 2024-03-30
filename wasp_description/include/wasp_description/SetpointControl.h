@@ -85,8 +85,6 @@ private:
     int m_BaseFlightTime;
 
     ros::Publisher m_PubActuator;
-    double gm;
-    double control;
 
     ros::Publisher m_PubLocalPose;
     ros::Publisher m_PubLocalVel;

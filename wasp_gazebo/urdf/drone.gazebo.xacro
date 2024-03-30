@@ -78,7 +78,7 @@
     </joint>
 
     <!-- Comment this section to disable GPS -->
-<!--    <include>
+    <include>
       <uri>model://gps</uri>
       <pose>0 0 0 0 0 0</pose>
       <name>gps</name>
@@ -86,7 +86,7 @@
     <joint name='gps_joint' type='fixed'>
       <child>gps::link</child>
       <parent>base_link</parent>
-    </joint>-->
+    </joint>
 
     <plugin name='rosbag' filename='libgazebo_multirotor_base_plugin.so'>
       <robotNamespace></robotNamespace>
