@@ -17,6 +17,7 @@
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
 
+#include <thread>
 
 namespace gazebo {
 
@@ -24,6 +25,12 @@ namespace gazebo {
         uint32_t m_I0;
         uint32_t m_I1;
         uint32_t m_I2;
+    };
+
+    struct SParticle{
+        ignition::math::Pose3d wp;
+        ignition::math::Vector3d ray;
+        double tlim;
     };
 
     struct Particle{
@@ -49,6 +56,13 @@ namespace gazebo {
 
         void extruder_cb(const std_msgs::Bool::ConstPtr& msg);
 
+        void emitter();
+        void emit();
+
+        void spawn_particles();
+        void update_particles();
+        void merge_particles();
+
         bool intersectSphereGround(const ignition::math::Vector3d& origin, double radius, const ignition::math::Vector3d& vel, double& t);
         bool intersectSphereFoam(const std::vector<ignition::math::Vector3d>& foam, const ignition::math::Vector3d& origin, double radius, const ignition::math::Vector3d& vel, double& t);
 
@@ -64,6 +78,9 @@ namespace gazebo {
 
         ignition::math::Rand random;
 
+        std::thread th;
+
+        std::vector<SParticle> spawnParticles;
         std::vector<Particle> particles;
         std::vector<Particle> buffer;
         std::vector<ignition::math::Vector3d> segments;
@@ -74,6 +91,7 @@ namespace gazebo {
         double particleSize_ = 0.05;
         double growthFactor_ = 3.107;
         double ejectSpeed_ = 0.3;
+        double divergence_ = 7.2;
         int bufferSize_ = 500;
         bool useROS_ = true;
 

@@ -19,8 +19,8 @@
       <xacro:property name="index" value="${indices.pop(0)}"/>
       <gazebo reference="rotor_${index}">
         <material>
-          <xacro:if value="${index == 0 or index == 3 or index == 4}">Gazebo/Blue</xacro:if>
-          <xacro:if value="${index == 1 or index == 2 or index == 5}">Gazebo/Red</xacro:if></material>
+          <xacro:if value="${index == 1 or index == 3 or index == 4}">Gazebo/Blue</xacro:if>
+          <xacro:if value="${index == 0 or index == 2 or index == 5}">Gazebo/Red</xacro:if></material>
       </gazebo>
       <xacro:rotor_material_loop/>
     </xacro:if>
@@ -37,6 +37,7 @@
           </geometry>
           <plugin name="foamer" filename="libwasp_gazebo.so">
             <particleSize>0.02</particleSize>
+            <divergence>7.18</divergence>
           </plugin>
         </visual>
     <material>Gazebo/White</material>
@@ -103,8 +104,8 @@
           <jointName>rotor_${index}_joint</jointName>
           <linkName>rotor_${index}</linkName>
           <turningDirection>
-            <xacro:if value="${index == 1 or index == 2 or index == 5}">ccw</xacro:if>
-            <xacro:if value="${index == 0 or index == 3 or index == 4}">cw</xacro:if>
+            <xacro:if value="${index == 0 or index == 2 or index == 5}">ccw</xacro:if>
+            <xacro:if value="${index == 1 or index == 3 or index == 4}">cw</xacro:if>
           </turningDirection>
           <timeConstantUp>0.0125</timeConstantUp>
           <timeConstantDown>0.025</timeConstantDown>
@@ -194,7 +195,7 @@
       <accelerometerTurnOnBiasSigma>0.196</accelerometerTurnOnBiasSigma>
     </plugin>
 
-    <!--    <plugin name='camera' filename='librealsense_gazebo_plugin.so'>
+<!--    <plugin name='camera' filename='librealsense_gazebo_plugin.so'>
       <prefix>camera</prefix>
       <depthUpdateRate>30.0</depthUpdateRate>
       <colorUpdateRate>30.0</colorUpdateRate>

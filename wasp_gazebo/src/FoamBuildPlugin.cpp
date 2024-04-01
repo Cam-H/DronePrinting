@@ -17,6 +17,8 @@ void FoamBuildPlugin::Load(rendering::VisualPtr _parent, sdf::ElementPtr _sdf) {
       std::string name = _sdf->GetName();
       if (name == "particleSize")
         _sdf->GetValue()->Get(particleSize_);
+      else if (name == "divergence")
+        _sdf->GetValue()->Get(divergence_);
       else if (name == "growthFactor")
         _sdf->GetValue()->Get(growthFactor_);
       else if (name == "ejectSpeed")
@@ -48,6 +50,8 @@ void FoamBuildPlugin::Load(rendering::VisualPtr _parent, sdf::ElementPtr _sdf) {
 
     extruding = !useROS_;
 
+    th = std::thread(&FoamBuildPlugin::emitter, this);
+
     // Listen to the update event. This event is broadcast every simulation iteration.
     this->updateConnection = event::Events::ConnectRender(std::bind(&FoamBuildPlugin::OnUpdate, this));
     this->removeConnection = event::Events::ConnectPause(std::bind(&FoamBuildPlugin::OnRemove, this));
@@ -57,21 +61,24 @@ void FoamBuildPlugin::extruder_cb(const std_msgs::Bool::ConstPtr& msg){
     extruding = (*msg).data;
 }
 
-// Called by the world update start event
-void FoamBuildPlugin::OnUpdate() {
-  if(!extruding){
-    return;
-  }
+void FoamBuildPlugin::emitter(){
+  while(true){
+    if(extruding){
+      emit();
+    }
 
-  static int i = 0, j = 0, k = 0;
-  if(i++ % 1 == 0){
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+}
+
+void FoamBuildPlugin::emit(){
 
     // Calculate appropriate direction for ejection
     ignition::math::Pose3d wp = this->visual->WorldPose();
     ignition::math::Vector3d ray = (wp.Rot() * ignition::math::Vector3d(0, 0, -1)).Normalize();
 
     // Apply random error to ejection direction
-    double phi = random.DblUniform(0, IGN_PI / 12), theta = random.DblUniform(-IGN_PI, IGN_PI);
+    double phi = random.DblUniform(0, IGN_PI * divergence_ / 180), theta = random.DblUniform(-IGN_PI, IGN_PI);
     ray = (ignition::math::Quaterniond(ray, theta) * (ignition::math::Quaterniond(ray.Perpendicular(), phi) * ray)).Normalize();
 
     // Check for collision with ground or other segments
@@ -81,7 +88,17 @@ void FoamBuildPlugin::OnUpdate() {
 
     // Only create particle if there is a collision (Assumes linear path which otherwise introduces issues)
     if(hit){
-      std::string name = "V" + std::to_string(j++);
+      spawnParticles.push_back({wp, ray, t});
+    }
+
+    // std::cout << "VC" << this->visual->GetScene()->VisualCount() << " B" << k << " BUF" << buffer.size() << "/" << bufferSize_ << " P" << particles.size() << "\n";
+}
+
+void FoamBuildPlugin::spawn_particles(){
+    static int ID = 0;
+
+    for(uint32_t i = 0; i < spawnParticles.size(); i++){
+      std::string name = "V" + std::to_string(ID++);
       // std::cout << name << "\n";
 
       rendering::VisualPtr vis = std::make_shared<rendering::Visual>(name, this->visual->GetScene());
@@ -90,22 +107,15 @@ void FoamBuildPlugin::OnUpdate() {
       vis->AttachObject(Spheres(name, (float)particleSize_, 0));
 
       vis->SetScale(ignition::math::Vector3d(1, 1, 1) / growthFactor_);
-      vis->SetPose(wp);
+      vis->SetPose(spawnParticles[i].wp);
 
-      particles.push_back({vis, wp.Pos(), ray, 0, t});
+      particles.push_back({vis, spawnParticles[i].wp.Pos(), spawnParticles[i].ray, 0, spawnParticles[i].tlim});
     }
 
-      // std::cout << "VC" << this->visual->GetScene()->VisualCount() << " B" << k << " BUF" << buffer.size() << "/" << bufferSize_ << " P" << particles.size() << "\n";
-  }
+    spawnParticles.clear();
+}
 
-  // static float theta = 0, zz = -2.8; theta += IGN_PI / 256;
-  // if(theta > 2 * IGN_PI){
-  //   theta = 0;
-  //   zz += 0.1;
-  // }
-  // this->visual->SetPosition(ignition::math::Vector3d(cos(theta), sin(theta), zz));
-
-
+void FoamBuildPlugin::update_particles(){
   for(uint32_t i = 0; i < particles.size(); i++){
     ignition::math::Vector3d scale = particles[i].vis->Scale();
     scale *= scale.X() > 1.0 ? 1.0 : 1.1;
@@ -123,6 +133,10 @@ void FoamBuildPlugin::OnUpdate() {
       continue;
     }
   }
+}
+
+void FoamBuildPlugin::merge_particles() {
+  static int BLOCK_ID = 0;
 
   if(buffer.size() > bufferSize_){
     std::vector<ignition::math::Vector3f> poses;
@@ -133,7 +147,7 @@ void FoamBuildPlugin::OnUpdate() {
     }
 
     // Create new visual composed of a block of foam particles
-    std::string name = "BLOCK" + std::to_string(k++);
+    std::string name = "BLOCK" + std::to_string(BLOCK_ID++);
     rendering::VisualPtr vis = std::make_shared<rendering::Visual>(name, this->visual->GetScene());
     this->visual->GetScene()->AddVisual(vis);
 
@@ -141,12 +155,14 @@ void FoamBuildPlugin::OnUpdate() {
 
     buffer.clear();
   }
-
 }
 
-void FoamBuildPlugin::OnRemove() {
-    std::cout << "y\n";
+void FoamBuildPlugin::OnUpdate() {
+  spawn_particles();
+  update_particles();
+  merge_particles();
 }
+void FoamBuildPlugin::OnRemove() {}
 
 bool FoamBuildPlugin::intersectSphereGround(const ignition::math::Vector3d& origin, double radius, const ignition::math::Vector3d& vel, double& t){
   ignition::math::Vector3d normal (0, 0, 1);
