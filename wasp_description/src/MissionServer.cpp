@@ -7,6 +7,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "mission_server");
 
     MissionServer ms;
+    std::thread th(&MissionServer::command_monitor, &ms);
 
     ros::spin();
 
@@ -19,27 +20,19 @@ MissionServer::MissionServer() : m_Step(0) {
     m_MissionService = nh.advertiseService("request_mission", &MissionServer::mission, this);
     loadParameters();
 
-    if(filepath_.length() > 0){
-        m_Path = load(filepath_);
-    }else{
+    m_Path = load(filepath_, true);
+    m_Step == 0;
 
-        // Generate square path when non gcode is provided
-        for(double z = 0.0; z < 1; z+=0.01){
-            m_Path.push_back({0, 5, z, 1});
-            m_Path.push_back({0, 10, z, 1});
-            m_Path.push_back({5, 10, z, 1});
-            m_Path.push_back({5, 5, z, 1});
-        }
-    }
-    std::cout << acceptanceRadius(targetSpeed) << "\n";
-    ROS_INFO("Ready to serve build paths");
+    std::cout << acceptanceRadius(m_TargetSpeed) << "\n";
+    if(m_Step < m_Path.size()) ROS_INFO("Ready to serve build paths");
 }
 
 void MissionServer::loadParameters(){
 
     ros::param::param <std::string>("~path", filepath_, "");
 
-    ros::param::param <double>("~speed", targetSpeed, 0.1);
+    ros::param::param <double>("~speed", m_TargetSpeed, 0.5);
+    ros::param::param <double>("~layerHeight", m_LayerHeight, 0.01);
     ros::param::param <double>("~zOffset", zOffset, 0.3);
 
     ros::param::param <double>("~gx", ox, 47.39774);
@@ -47,10 +40,63 @@ void MissionServer::loadParameters(){
     transform = GeographicLib::LocalCartesian(ox, oy);
 }
 
-std::vector<Pose> MissionServer::load(const std::string& filepath){
+void MissionServer::command_monitor(){
+    int i = 0;
+    while(true){
 
-    std::fstream file;
+        std::string input;
+        std::getline(std::cin, input);
+
+        // Convert to lower case to eliminate duplicate conditions
+        std::transform(input.begin(), input.end(), input.begin(), [](unsigned char c){ return std::tolower(c); });
+
+        if(input.length() > 0){
+            switch(input[0]){
+                case 'l':
+                    if(checkToken(input, "load ")){
+                        m_Path = load(ltrim(input.substr(5)));
+                        m_Step == 0;
+                    }
+                    break;
+                case 'i':
+                    if(checkToken(input, "info")){
+                        stats();
+                    }
+                    break;
+                case 'q': case 'Q':
+                    std::cout << "Quitting...\n";
+                    ros::shutdown();
+                    return;
+            }
+
+            std::cout << input << "\n";
+
+        }
+    }
+}
+
+void MissionServer::stats(){
+    std::cout << "********************************\n";
+    std::cout << "PROGRESS:" << m_Step << " / " << m_Path.size() << "\n";
+    std::cout << "SPEED = " << m_TargetSpeed << "\n";
+    std::cout << "********************************\n";
+}
+
+std::vector<Pose> MissionServer::load(const std::string& filepath, bool fallback){
     std::vector<Pose> path = {Pose{0, 0, 0, false}};
+    std::fstream file;
+
+    if(!fileExists(filepath)){
+        if(filepath.length() > 0) ROS_WARN("Failed to find specified file!");
+
+        if(fallback){
+            ROS_INFO("Fall back to default form");
+            return square(0, 5, 5, 5, 1);
+        }
+
+        return {};
+    }
+
 
     // ROS_INFO("Loading: %s", filepath);
     std::cout << filepath << "\n";
@@ -118,11 +164,25 @@ std::vector<Pose> MissionServer::load(const std::string& filepath){
     return path;
 }
 
+std::vector<Pose> MissionServer::square(double x, double y, double length, double width, double height){
+    std::vector<Pose> path;
+    path.reserve(4 * (int)(height / m_LayerHeight));
+
+    for(double z = 0.0; z < height; z += m_LayerHeight){
+        path.push_back({x,          y,         z, 1});
+        path.push_back({x,          y + width, z, 1});
+        path.push_back({x + length, y + width, z, 1});
+        path.push_back({x + length, y,         z, 1});
+    }
+
+    return path;
+}
+
 bool MissionServer::mission(wasp_description::RequestMission::Request &req, wasp_description::RequestMission::Response& res){
 
     // Calculate an appropriate mission length based on requested flight time
     uint32_t last = m_Step + 1;//TODO properly calculate heading time
-    double travel = 0, target = req.flighttime * targetSpeed;
+    double travel = 0, target = req.flighttime * m_TargetSpeed;
     for(; last < m_Path.size() - 1; last++){
         double delta = Pose::distance(m_Path[last], m_Path[last + 1]);
         if(travel + delta > target) break;
@@ -151,16 +211,15 @@ bool MissionServer::mission(wasp_description::RequestMission::Request &req, wasp
     res.waypoints.push_back(poseWaypoint(m_Path[m_Step]));
 
     bool active = false;
-    std::cout << "NPATH:\n";
     // Print path waypoints
     for(uint32_t i = m_Step + 1; i <= last; i++){
         if(m_Path[i].active != active){
             active = m_Path[i].active;
-            res.waypoints.push_back(speedWaypoint(active ? targetSpeed : -2));
-            res.ctrl.push_back(res.waypoints.size() - 1);
+            res.waypoints.push_back(speedWaypoint(active ? m_TargetSpeed : -2));
+            res.ctrl.push_back(res.waypoints.size());
         }
 
-        if(active) res.waypoints.push_back(poseWaypoint(m_Path[i], acceptanceRadius(targetSpeed)));
+        if(active) res.waypoints.push_back(poseWaypoint(m_Path[i], acceptanceRadius(m_TargetSpeed)));
         else res.waypoints.push_back(poseWaypoint(m_Path[i]));
 
     }
@@ -197,7 +256,7 @@ mavros_msgs::Waypoint MissionServer::poseWaypoint(const Pose& pose, double accep
 
     double lat, lon, alt;
     transform.Reverse(pose.x, pose.y, pose.z + zOffset, lat, lon, alt);
-    std::cout << pose.x << " " << pose.y << " " << pose.z << "\n";
+    // std::cout << pose.x << " " << pose.y << " " << pose.z << "\n";
 
     wp.x_lat = lat;
     wp.y_long = lon;

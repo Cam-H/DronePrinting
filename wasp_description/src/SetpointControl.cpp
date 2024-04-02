@@ -19,19 +19,16 @@ int main(int argc, char **argv){
     // std::thread th1(&PoseEntry::monitor, &pe);
     ROS_INFO("FCU Connection wait...");
 
-    SetpointControl sc(nh);
-    std::thread th(&SetpointControl::command_monitor, &sc);
 
     // Wait for FCU connection
     while(ros::ok() && !current_state.connected){
         ros::spinOnce();
         rate.sleep();
-
-                sc.publish();
-
     }
 
     ROS_INFO("FCU Connection successful");
+
+    SetpointControl sc(nh);
 
     // Send a few setpoints before starting
     for(int i = 0; ros::ok() && i < 10; i++){
@@ -75,25 +72,33 @@ SetpointControl::SetpointControl(ros::NodeHandle nh) : m_Mode(Mode::DISARM){
     m_WPPushClient = nh.serviceClient<mavros_msgs::WaypointPush>("mavros/mission/push");
     m_WPClearClient = nh.serviceClient<mavros_msgs::WaypointClear>("mavros/mission/clear");
 
+    loadParameters();
 
-    m_Ready = m_InProcess = false;
-    // monitor();
+    init();
+}
+
+void SetpointControl::init(){
+    m_Extruding = m_InProcess = false;
+
+    if(!m_MonitorAlive){
+        m_Thread = std::thread(&SetpointControl::command_monitor, this);
+        m_MonitorAlive = true;
+    }
+
+    m_WaypointCtrlIdx = m_LastWaypoint = m_WaypointCount = 0;
+    m_WaypointCtrl.clear();
+
+    swapMode(m_Manual ? "mode position" : "mode print");
 }
 
 void SetpointControl::loadParameters(){
-    ros::param::param <int>("~flighttime", m_BaseFlightTime, 300);
+    ros::param::param <int>("~flighttime", m_BaseFlightTime, 240);
+    ros::param::param<bool>("~manual", m_Manual, false);
+    ros::param::param<bool>("~sim", m_Sim, false);
 }
 
 void SetpointControl::local_pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg){
     m_LocalPose = *msg;
-
-    // Only ready once the starting position is recognized - Don't want to risk uncontrolled rtl
-    if(!isReady()){
-        m_LinearTarget.x = m_LocalPose.pose.position.x;
-        m_LinearTarget.y = m_LocalPose.pose.position.y;
-        m_LinearTarget.z = m_LocalPose.pose.position.z;
-        m_Ready = true;
-    }
 }
 
 void SetpointControl::local_vel_cb(const geometry_msgs::TwistStamped::ConstPtr& msg){
@@ -102,24 +107,35 @@ void SetpointControl::local_vel_cb(const geometry_msgs::TwistStamped::ConstPtr& 
 
 void SetpointControl::state_cb(const mavros_msgs::State::ConstPtr& msg){
     m_CurrentState = *msg;
+
+    if(m_CurrentState.mode == "AUTO.MISSION"){
+        m_InProcess |= m_CurrentState.armed;
+
+        if(!m_CurrentState.armed && missionComplete()){
+            finish();
+        }
+    }
 }
 
 void SetpointControl::waypoint_reached_cb(const mavros_msgs::WaypointReached::ConstPtr& msg){
-    m_LastWaypoint = msg->wp_seq + 1;
+    if(m_LastWaypoint != msg->wp_seq){
+        m_LastWaypoint = msg->wp_seq;
 
-    std::cout << m_LastWaypoint << " " << m_WaypointCount << "\n";
-    // TODO modify to allow cycles so "mode print" is not needed every time
-    if(m_LastWaypoint == m_WaypointCount){
-        ROS_INFO("Mission complete. Disarming drone");
-        m_Mode = Mode::DISARM;
+        if(m_WaypointCtrl[m_WaypointCtrlIdx] <= m_LastWaypoint){
+            m_WaypointCtrlIdx++;
+            m_Extruding = !m_Extruding;
+        }
+
+        std::cout << m_LastWaypoint << " " << m_WaypointCount << " " << m_WaypointCtrlIdx << " " << m_WaypointCtrl[m_WaypointCtrlIdx] << "\n";
     }
 }
 
 void SetpointControl::command_monitor(){
     int i = 0;
-    while(true){
 
-        std::string input;
+    std::string input;
+    while(!checkToken(input, "q")){
+
         std::getline(std::cin, input);
 
         // Convert to lower case to eliminate duplicate conditions
@@ -151,17 +167,18 @@ void SetpointControl::command_monitor(){
                     updateField(input.substr(1), m_AngularTarget.z);
                     break;
                 case 'p':
-                    m_InProcess = !m_InProcess;//TODO better this
+                    if(!inProcess()){
+                        m_Extruding = !m_Extruding;
+                    }
                     break;
-                case 'q': case 'Q':
-                    std::cout << "Quitting...\n";
-                    return;
             }
 
             std::cout << m_LinearTarget.x << " " << m_LinearTarget.y << " " << m_LinearTarget.z << "\n";
-
         }
     }
+
+    m_MonitorAlive = false;
+    finish();
 }
 
 void SetpointControl::update(){
@@ -170,20 +187,23 @@ void SetpointControl::update(){
     // if(m_Mode == Mode::DISARM){
     //     return;
     // }
+
+    mavros_msgs::SetMode set_mode;
+    mavros_msgs::CommandBool arm_cmd;
+    arm_cmd.request.value = true;
+
     std::string mode = "MANUAL";
     switch(m_Mode){
         case Mode::PRINTING:
             mode = "AUTO.MISSION";
+            arm_cmd.request.value = !inProcess();
             break;
         case Mode::POSITION: case Mode::VELOCITY: case Mode::ACCELERATION:
             mode = "OFFBOARD";
             break;
     }
-
-    mavros_msgs::SetMode set_mode;
     set_mode.request.custom_mode = mode;
-    mavros_msgs::CommandBool arm_cmd;
-    arm_cmd.request.value = true;
+
 
     if(m_CurrentState.mode != mode && (ros::Time::now() - last_request > ros::Duration(5.0))){
         if(m_SetModeClient.call(set_mode) && set_mode.response.mode_sent){
@@ -191,9 +211,9 @@ void SetpointControl::update(){
         }
         last_request = ros::Time::now();
     } else {
-        if(!m_CurrentState.armed && (ros::Time::now() - last_request > ros::Duration(5.0))){
-            if(m_ArmingClient.call(arm_cmd) && arm_cmd.response.success){
-                ROS_INFO("Vehicle armed");
+        if(m_CurrentState.armed != arm_cmd.request.value && (ros::Time::now() - last_request > ros::Duration(5.0))){
+            if(!inProcess() && m_ArmingClient.call(arm_cmd) && arm_cmd.response.success){
+
             }
 
             last_request = ros::Time::now();
@@ -206,7 +226,6 @@ void SetpointControl::update(){
 
 void SetpointControl::swapMode(const std::string& str){
     if(m_Mode == Mode::PRINTING && inProcess()) return;// Prevent mode changing when completing a print run
-
 
     if(str == "mode disarm"){
         m_Mode = Mode::DISARM;
@@ -230,10 +249,14 @@ void SetpointControl::swapMode(const std::string& str){
     }
 }
 
+bool SetpointControl::clearMission(){
+    mavros_msgs::WaypointClear clrsrv;
+    return m_WPClearClient.call(clrsrv) && clrsrv.response.success;
+}
+
 void SetpointControl::reqMission(){
 
-    mavros_msgs::WaypointClear clrsrv;
-    if(!m_WPClearClient.call(clrsrv) || !clrsrv.response.success){
+    if(!clearMission()){
         ROS_WARN("Failed to clear old waypoints");
         return;
     }
@@ -248,7 +271,11 @@ void SetpointControl::reqMission(){
         m_WaypointCtrlIdx = 0;
 
         if(!srv.response.waypoints.empty()){
-            std::cout << srv.response.waypoints.size() << "\n";
+            // std::cout << "seq: "  << " " << srv.response.waypoints.size() << "\n";
+            // for(uint32_t i = 0; i < srv.response.waypoints.size(); i++){
+            //     mavros_msgs::Waypoint wp = srv.response.waypoints[i];
+            //     std::cout << wp.frame << " " << wp.command << " " << wp.is_current << " " << wp.autocontinue << " " << wp.param1 << " " << wp.param2 << " " << wp.param3 << " " << wp.param4 << " " << wp.x_lat << " " << wp.y_long << " " << wp.z_alt << "\n";
+            // }
 
             mavros_msgs::WaypointPush pushsrv;
             pushsrv.request.start_index = 0;
@@ -261,10 +288,6 @@ void SetpointControl::reqMission(){
 }
 
 void SetpointControl::publish(){
-    if(!isReady() && false){
-        ROS_WARN("Not yet ready, did not publish setpoint");
-        return;
-    }
 
     switch(m_Mode){
         case Mode::PRINTING:
@@ -298,15 +321,29 @@ void SetpointControl::publish(){
     }
 
     std_msgs::Bool val;
-    val.data = m_InProcess;
+    val.data = m_Extruding;
     m_PubExtrusion.publish(val);
 }
 
-bool SetpointControl::isReady(){
-    return m_Ready;
+void SetpointControl::finish(){
+    ROS_INFO("Terminating WASP control");
+
+    // TODO notification to mission server
+    clearMission();
+
+    if(m_Sim){// In sim, restarting manually is preferred
+        init();
+        reqMission();
+    }else{
+        // TODO confirm safe landing / disarm
+        system("poweroff");
+    }
 }
 
 bool SetpointControl::inProcess(){
     return m_InProcess;
 }
 
+bool SetpointControl::missionComplete(){
+    return m_WaypointCount > 0 && m_LastWaypoint == m_WaypointCount - 2;
+}

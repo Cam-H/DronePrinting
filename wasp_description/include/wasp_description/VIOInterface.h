@@ -24,6 +24,8 @@ public:
 
 private:
     void odom_cb(const nav_msgs::Odometry::ConstPtr& msg);
+
+    void reset_vio();
 private:
 
     ros::Subscriber m_SubOdom;
@@ -39,4 +41,7 @@ private:
 
     double m_Timeout;
     std::chrono::time_point<std::chrono::steady_clock> m_LastPostTime;
+
+    double m_CumulativeError;
+    double m_CumulativeLimit;
 };

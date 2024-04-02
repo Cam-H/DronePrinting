@@ -39,6 +39,8 @@ void VIOInterface::loadParameters(){
     if(m_CriticalLimit < m_TerminationLimit) m_CriticalLimit = m_TerminationLimit;
 
     ros::param::param <double>("~timeout", m_Timeout, 0.5);
+
+    ros::param::param <double>("~cumulative_limit", m_CumulativeLimit, 5.0);
 }
 
 void VIOInterface::odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
@@ -61,6 +63,11 @@ void VIOInterface::odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
     }
 }
 
+void VIOInterface::reset_vio(){
+    // ROS_WARN("");
+    m_CumulativeError = 0;
+}
+
 void VIOInterface::publish(){
     mavros_msgs::CompanionProcessStatus cmsg;
     cmsg.component = mavros_msgs::CompanionProcessStatus::MAV_COMP_ID_VISUAL_INERTIAL_ODOMETRY;
@@ -71,13 +78,16 @@ void VIOInterface::publish(){
     if(elapsed_seconds.count() > m_Timeout){
         ROS_WARN("VIO Timeout. No Odometry received");
     } else {
-        // if(m_FeatureCount > m_CriticalLimit){
-        //     cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_ACTIVE;
-        // }else if(m_FeatureCount > m_TerminationLimit){
-        //     cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_CRITICAL;
-        // }
-        cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_ACTIVE;
+        if(m_FeatureCount < m_TerminationLimit || m_CumulativeError > m_CumulativeLimit){
+            m_CumulativeError += elapsed_seconds.count();
+        }else if(m_FeatureCount < m_CriticalLimit){
+            cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_CRITICAL;
+        }else{
+            cmsg.state = mavros_msgs::CompanionProcessStatus::MAV_STATE_ACTIVE;
+        }
     }
+
+    if(m_CumulativeError > m_CumulativeLimit) reset_vio();
 
     m_PubVIOState.publish(cmsg);
 }

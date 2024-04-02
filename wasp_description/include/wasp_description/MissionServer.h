@@ -44,11 +44,15 @@ struct Pose{
 class MissionServer{
 public:
 
-
     MissionServer();
     void loadParameters();
 
-    std::vector<Pose> load(const std::string& filepath);
+    void command_monitor();
+
+    void stats();
+
+    std::vector<Pose> load(const std::string& filepath, bool fallback = false);
+    std::vector<Pose> square(double x, double y, double length, double width, double height);
 
 private:
 
@@ -72,7 +76,8 @@ private:
 
     /** CONFIGURATION PARAMETERS **/
     std::string filepath_;
-    double targetSpeed;
+    double m_TargetSpeed;
+    double m_LayerHeight;
     double m_AcceptRadius;
     double zOffset;
 

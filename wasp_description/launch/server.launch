@@ -1,10 +1,22 @@
 <?xml version="1.0"?>
 <launch>
 
-    <node pkg="wasp_description" type="setup.sh" name="server_setup" output="screen">
+<!--    <node pkg="wasp_description" type="setup.sh" name="server_setup" output="screen">
         <param name="device_id" type="string" value="3120zzzzzzzzzzzzz" />
-    </node>
+    </node>-->
 
-<!--     <node pkg="wasp_description" type="mission_server" name="server" output="screen"> -->
+    <arg name="path" default=""/>
+
+    <arg name="speed" default="0.5"/>
+    <arg name="layerHeight" default="0.01"/>
+    <arg name="zOffset" default="0.3"/>
+
+    <node pkg="wasp_description" type="mission_server" name="server" output="screen">
+        <param name="path" value="$(arg path)" />
+
+        <param name="speed" value="$(arg speed)" />
+        <param name="layerHeight" value="$(arg layerHeight)" />
+        <param name="zOffset" value="$(arg zOffset)" />
+    </node>
 
 </launch>

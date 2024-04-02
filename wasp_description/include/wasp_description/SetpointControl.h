@@ -36,6 +36,7 @@ public:
     };
 
     SetpointControl(ros::NodeHandle nh);
+    void init();
     void loadParameters();
 
     void start();
@@ -43,11 +44,15 @@ public:
 
     void update();
     void publish();
+    void finish();
 
-    bool isReady();
-    bool inProcess();
-private:
     void swapMode(const std::string& str);
+
+    bool inProcess();
+    bool missionComplete();
+private:
+
+    bool clearMission();
     void reqMission();
 
     void state_cb(const mavros_msgs::State::ConstPtr& msg);
@@ -59,9 +64,15 @@ private:
 
 private:
 
+    std::thread m_Thread;
+    bool m_MonitorAlive;
+
     Mode m_Mode;
-    bool m_Ready;
     bool m_InProcess;
+    bool m_Extruding;
+
+    bool m_Manual;
+    bool m_Sim;
 
     geometry_msgs::Vector3 m_LinearTarget;
     geometry_msgs::Vector3 m_AngularTarget;
