@@ -113,11 +113,11 @@
       <robotNamespace/>
       <xyzOffset>1 0 0</xyzOffset>
       <windDirectionMean>0 1 0</windDirectionMean>
-      <windVelocityMean>5</windVelocityMean>
-      <windGustDirection>0 0 0</windGustDirection>
-      <windGustDuration>0</windGustDuration>
-      <windGustStart>0</windGustStart>
-      <windGustVelocityMean>0</windGustVelocityMean>
+      <windVelocityMean>1</windVelocityMean>
+      <windGustDirection>0 1 0</windGustDirection>
+      <windGustDuration>4</windGustDuration>
+      <windGustStart>1</windGustStart>
+      <windGustVelocityMean>0.5</windGustVelocityMean>
       <windPubTopic>world_wind</windPubTopic>
     </plugin>-->
   </world>

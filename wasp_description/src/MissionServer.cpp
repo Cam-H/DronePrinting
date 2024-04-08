@@ -1,7 +1,5 @@
 #include "wasp_description/MissionServer.h"
 
-#include "wasp_description/WaspUtils.h"
-
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "mission_server");
@@ -20,20 +18,20 @@ MissionServer::MissionServer() : m_Step(0) {
     m_MissionService = nh.advertiseService("request_mission", &MissionServer::mission, this);
     loadParameters();
 
-    m_Path = load(filepath_, true);
+    load(m_Vertices, m_Segments, filepath_, true);
     m_Step == 0;
 
     std::cout << acceptanceRadius(m_TargetSpeed) << "\n";
-    if(m_Step < m_Path.size()) ROS_INFO("Ready to serve build paths");
+    if(m_Step < m_Segments.size()) ROS_INFO("Ready to serve build paths");
 }
 
 void MissionServer::loadParameters(){
 
     ros::param::param <std::string>("~path", filepath_, "");
 
-    ros::param::param <double>("~speed", m_TargetSpeed, 0.5);
+    ros::param::param <double>("~speed", m_TargetSpeed, 0.8);
     ros::param::param <double>("~layerHeight", m_LayerHeight, 0.01);
-    ros::param::param <double>("~zOffset", zOffset, 0.3);
+    ros::param::param <double>("~zOffset", m_ZOffset, 0.3);
 
     ros::param::param <double>("~gx", ox, 47.39774);
     ros::param::param <double>("~gy", oy, 8.54559);
@@ -54,7 +52,7 @@ void MissionServer::command_monitor(){
             switch(input[0]){
                 case 'l':
                     if(checkToken(input, "load ")){
-                        m_Path = load(ltrim(input.substr(5)));
+                        load(m_Vertices, m_Segments, ltrim(input.substr(5)));
                         m_Step == 0;
                     }
                     break;
@@ -77,13 +75,13 @@ void MissionServer::command_monitor(){
 
 void MissionServer::stats(){
     std::cout << "********************************\n";
-    std::cout << "PROGRESS:" << m_Step << " / " << m_Path.size() << "\n";
+    std::cout << "PROGRESS:" << m_Step << " / " << m_Segments.size() << "\n";
     std::cout << "SPEED = " << m_TargetSpeed << "\n";
     std::cout << "********************************\n";
 }
 
-std::vector<Pose> MissionServer::load(const std::string& filepath, bool fallback){
-    std::vector<Pose> path = {Pose{0, 0, 0, false}};
+void MissionServer::load(std::vector<vec3>& vertices, std::vector<Segment>& segments, const std::string& filepath, bool fallback){
+    std::vector<vec3> path = {vec3{0, 0, 0}};
     std::fstream file;
 
     if(!fileExists(filepath)){
@@ -91,106 +89,112 @@ std::vector<Pose> MissionServer::load(const std::string& filepath, bool fallback
 
         if(fallback){
             ROS_INFO("Fall back to default form");
-            return square(0, 5, 5, 5, 1);
+            return square(vertices, segments, 0, 5, 5, 5, 1);
         }
 
-        return {};
+        return;
     }
 
+    vertices.clear();
+    segments.clear();
 
-    // ROS_INFO("Loading: %s", filepath);
-    std::cout << filepath << "\n";
-    file.open(filepath, std::ios::in);
-    if (file.is_open()){
-        std::string line;
-        bool active = false, activated = false;
-        while(std::getline(file, line)){ //read data from file object and put it into string.
 
-            // Remove g-code comments
-            std::string::size_type idx = line.find(';');
-            line = (idx == std::string::npos) ? line : line.substr(0, idx);
-            if(line.length() == 0){
-                continue;
-            }
-
-            Pose pose = path[path.size() - 1];
-
-            // Separate line content into separate control items
-            std::regex word_regex("(\\w+\\d+\\.?\\d*)");
-            auto words_begin = std::sregex_iterator(line.begin(), line.end(), word_regex);
-            auto words_end = std::sregex_iterator();
-
-            int ignores = 0;
-            for (std::sregex_iterator i = words_begin; i != words_end; ++i){
-                std::string key = (*i).str();
-
-                // Handle co-ordinate definitions
-                switch(key[0]){
-                    case 'X':
-                        updateField(key.substr(1), pose.x);
-                        break;
-                    case 'Y':
-                        updateField(key.substr(1), pose.y);
-                        break;
-                    case 'Z':
-                        updateField(key.substr(1), pose.z);
-                        break;
-                    case 'E':
-                        active = activated = true;
-                        break;
-                    case 'F':
-                        active = false;
-                        break;
-                    default:
-                        ignores++;
-                }
-
-            }
-
-            // Only record new positions
-            pose.active = active;
-            if(activated && ignores != std::distance(words_begin, words_end) && pose != path[path.size() - 1]){
-                // std::cout << pose.x << " " << pose.y << " " << pose.z << " " << pose.active << "\n";
-                path.push_back(pose /= 15);
-            }
-
-        }
-
-        // Close the file for cleanup
-        file.close();
-
-    }
-
-    return path;
+    // // ROS_INFO("Loading: %s", filepath);
+    // std::cout << filepath << "\n";
+    // file.open(filepath, std::ios::in);
+    // if (file.is_open()){
+    //     std::string line;
+    //     bool active = false, activated = false;
+    //     while(std::getline(file, line)){ //read data from file object and put it into string.
+    //
+    //         // Remove g-code comments
+    //         std::string::size_type idx = line.find(';');
+    //         line = (idx == std::string::npos) ? line : line.substr(0, idx);
+    //         if(line.length() == 0){
+    //             continue;
+    //         }
+    //
+    //         Pose pose = path[path.size() - 1];
+    //
+    //         // Separate line content into separate control items
+    //         std::regex word_regex("(\\w+\\d+\\.?\\d*)");
+    //         auto words_begin = std::sregex_iterator(line.begin(), line.end(), word_regex);
+    //         auto words_end = std::sregex_iterator();
+    //
+    //         int ignores = 0;
+    //         for (std::sregex_iterator i = words_begin; i != words_end; ++i){
+    //             std::string key = (*i).str();
+    //
+    //             // Handle co-ordinate definitions
+    //             switch(key[0]){
+    //                 case 'X':
+    //                     updateField(key.substr(1), pose.x);
+    //                     break;
+    //                 case 'Y':
+    //                     updateField(key.substr(1), pose.y);
+    //                     break;
+    //                 case 'Z':
+    //                     updateField(key.substr(1), pose.z);
+    //                     break;
+    //                 case 'E':
+    //                     active = activated = true;
+    //                     break;
+    //                 case 'F':
+    //                     active = false;
+    //                     break;
+    //                 default:
+    //                     ignores++;
+    //             }
+    //
+    //         }
+    //
+    //         // Only record new positions
+    //         pose.active = active;
+    //         if(activated && ignores != std::distance(words_begin, words_end) && pose != path[path.size() - 1]){
+    //             // std::cout << pose.x << " " << pose.y << " " << pose.z << " " << pose.active << "\n";
+    //             path.push_back(pose /= 15);
+    //         }
+    //
+    //     }
+    //
+    //     // Close the file for cleanup
+    //     file.close();
+    //
+    // }
 }
 
-std::vector<Pose> MissionServer::square(double x, double y, double length, double width, double height){
-    std::vector<Pose> path;
-    path.reserve(4 * (int)(height / m_LayerHeight));
+void MissionServer::square(std::vector<vec3>& vertices, std::vector<Segment>& segments, double x, double y, double length, double width, double height){
+    vertices.reserve(4 * (int)(height / m_LayerHeight));
 
+    uint32_t level = 0, idx = 0;
     for(double z = 0.0; z < height; z += m_LayerHeight){
-        path.push_back({x,          y,         z, 1});
-        path.push_back({x,          y + width, z, 1});
-        path.push_back({x + length, y + width, z, 1});
-        path.push_back({x + length, y,         z, 1});
-    }
+        vertices.push_back({x,          y,         z});
+        vertices.push_back({x,          y + width, z});
+        vertices.push_back({x + length, y + width, z});
+        vertices.push_back({x + length, y,         z});
 
-    return path;
+        segments.push_back({idx,     idx + 1, level, false});
+        segments.push_back({idx + 1, idx + 2, level, false});
+        segments.push_back({idx + 2, idx + 3, level, false});
+        segments.push_back({idx + 3, idx,     level, false});
+        idx += 4;
+        level++;
+    }
 }
 
 bool MissionServer::mission(wasp_description::RequestMission::Request &req, wasp_description::RequestMission::Response& res){
 
     // Calculate an appropriate mission length based on requested flight time
-    uint32_t last = m_Step + 1;//TODO properly calculate heading time
+    std::vector<uint32_t> path;
     double travel = 0, target = req.flighttime * m_TargetSpeed;
-    for(; last < m_Path.size() - 1; last++){
-        double delta = Pose::distance(m_Path[last], m_Path[last + 1]);
+    for(; m_Step < m_Segments.size(); m_Step++){
+        double delta = vec3::distance(m_Vertices[m_Segments[m_Step].m_I0], m_Vertices[m_Segments[m_Step].m_I1]);
         if(travel + delta > target) break;
+        path.push_back(m_Step);
         travel += delta;
     }
 
-    if(travel <= 0) return false;
-    std::cout << m_Step << "-" << last << " / " << m_Path.size() << " | Travel: " << travel << " / " << target;
+    if(path.empty()) return false;
 
     /*************** PREPARE MISSION ********************/
     mavros_msgs::Waypoint wp;
@@ -202,31 +206,40 @@ bool MissionServer::mission(wasp_description::RequestMission::Request &req, wasp
     wp.command = mavros_msgs::CommandCode::NAV_TAKEOFF;
     wp.x_lat = ox;
     wp.y_long = oy;
-    wp.z_alt = 1;
+    wp.z_alt = 2;
     res.waypoints.push_back(wp);
 
     wp.is_current = false;
 
-    // Fly to initial print position
-    res.waypoints.push_back(poseWaypoint(m_Path[m_Step]));
+    res.ctrl.push_back(2);
+    for(uint32_t idx : path){
+        Segment& seg = m_Segments[idx];
 
-    bool active = false;
-    // Print path waypoints
-    for(uint32_t i = m_Step + 1; i <= last; i++){
-        if(m_Path[i].active != active){
-            active = m_Path[i].active;
-            res.waypoints.push_back(speedWaypoint(active ? m_TargetSpeed : -2));
-            res.ctrl.push_back(res.waypoints.size());
-        }
+        vec3 norm = m_Vertices[seg.m_I1] - m_Vertices[seg.m_I0];
+        norm = norm / norm.length();
 
-        if(active) res.waypoints.push_back(poseWaypoint(m_Path[i], acceptanceRadius(m_TargetSpeed)));
-        else res.waypoints.push_back(poseWaypoint(m_Path[i]));
+        vec3 start = m_Vertices[seg.m_I0] - norm * 3 * m_TargetSpeed;
+        // vec3 end = m_Vertices[seg.m_I1] + norm * m_TargetSpeed;
 
+        // Fly to initiation position
+        // res.waypoints.push_back(speedWaypoint(-2));
+        // res.waypoints.push_back(poseWaypoint(start, 1));
+
+        // Heading towards start position
+        res.waypoints.push_back(speedWaypoint(m_TargetSpeed));
+        res.waypoints.push_back(poseWaypoint(m_Vertices[seg.m_I0] + norm, 1));
+        // res.ctrl.push_back(res.waypoints.size() - 1);
+
+        // Heading towards final position while printing
+        res.waypoints.push_back(poseWaypoint(m_Vertices[seg.m_I1] + norm * 0.8, 1));
+        // res.ctrl.push_back(res.waypoints.size() - 1);
+
+        // std::cout << norm.x << " " << norm.y << " " << norm.z<< " " << norm.length() << "\n";
     }
 
     // Return to default speed
     res.waypoints.push_back(speedWaypoint(-2));
-    res.ctrl.push_back(res.waypoints.size() - 1);// Indicate print termination
+    res.ctrl.push_back(res.waypoints.size() - 1);
 
     // Create RTL waypoint
     wp.frame = mavros_msgs::Waypoint::FRAME_MISSION;
@@ -235,17 +248,16 @@ bool MissionServer::mission(wasp_description::RequestMission::Request &req, wasp
     wp.x_lat = wp.y_long = wp.z_alt = 0;
     res.waypoints.push_back(wp);
 
-    m_Step = last;
-
-    std::cout << " | Served: " << res.waypoints.size() << " waypoints\n";
+    std::cout << "Served: " << res.waypoints.size() << " waypoints\n";
     for(uint32_t idx : res.ctrl){
         std::cout << idx << " ";
-    }std::cout << "\n";
+    }
+    std::cout << "\n";
 
     return true;
 }
 
-mavros_msgs::Waypoint MissionServer::poseWaypoint(const Pose& pose, double acceptRadius){
+mavros_msgs::Waypoint MissionServer::poseWaypoint(const vec3& pose, double acceptRadius){
     mavros_msgs::Waypoint wp;
     wp.frame = mavros_msgs::Waypoint::FRAME_GLOBAL_REL_ALT;
     wp.command = mavros_msgs::CommandCode::NAV_WAYPOINT;
@@ -255,7 +267,7 @@ mavros_msgs::Waypoint MissionServer::poseWaypoint(const Pose& pose, double accep
     wp.param4 = NAN;
 
     double lat, lon, alt;
-    transform.Reverse(pose.x, pose.y, pose.z + zOffset, lat, lon, alt);
+    transform.Reverse(pose.x, pose.y, pose.z + m_ZOffset, lat, lon, alt);
     // std::cout << pose.x << " " << pose.y << " " << pose.z << "\n";
 
     wp.x_lat = lat;

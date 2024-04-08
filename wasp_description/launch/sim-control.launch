@@ -4,7 +4,7 @@
     <arg name="manual" default="false"/>
     <arg name="sim" default="true"/>
 
-    <arg name="flighttime" default="30" />
+    <arg name="flighttime" default="40" />
 
     <node pkg="wasp_description" type="wasp_control" name="ctrl" output="screen">
         <param name="manual" value="$(arg manual)" />

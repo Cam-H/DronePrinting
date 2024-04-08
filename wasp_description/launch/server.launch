@@ -9,7 +9,7 @@
 
     <arg name="speed" default="0.5"/>
     <arg name="layerHeight" default="0.01"/>
-    <arg name="zOffset" default="0.3"/>
+    <arg name="zOffset" default="2.3"/>
 
     <node pkg="wasp_description" type="mission_server" name="server" output="screen">
         <param name="path" value="$(arg path)" />
@@ -18,5 +18,8 @@
         <param name="layerHeight" value="$(arg layerHeight)" />
         <param name="zOffset" value="$(arg zOffset)" />
     </node>
+
+    <include file="$(find wasp_description)/launch/sim-control.launch" />
+    <include file="$(find wasp_gazebo)/launch/sitl.launch" />
 
 </launch>

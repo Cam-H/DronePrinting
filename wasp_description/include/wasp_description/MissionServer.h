@@ -17,28 +17,14 @@
 
 #include "wasp_description/RequestMission.h"
 
-struct Pose{
-    double x;
-    double y;
-    double z;
-    bool active;
+#include "wasp_description/WaspUtils.h"
 
-    bool operator==(const Pose& a){
-        return x == a.x && y == a.y && z == a.z;
-    }
+struct Segment{
+    uint32_t m_I0;
+    uint32_t m_I1;
 
-    bool operator!=(const Pose& a){
-        return !(*this == a);
-    }
-
-    Pose operator/=(double scalar) const {
-        return {x / scalar, y / scalar, z / scalar, active};
-    }
-
-    static double distance(const Pose& a, const Pose& b){
-        return sqrt(pow(a.x - b.x, 2) + pow(a.y - b.y, 2) + pow(a.z - b.z, 2));
-    }
-
+    uint32_t level;
+    bool complete;
 };
 
 class MissionServer{
@@ -51,14 +37,14 @@ public:
 
     void stats();
 
-    std::vector<Pose> load(const std::string& filepath, bool fallback = false);
-    std::vector<Pose> square(double x, double y, double length, double width, double height);
+    void load(std::vector<vec3>& vertices, std::vector<Segment>& segments, const std::string& filepath, bool fallback = false);
+    void square(std::vector<vec3>& vertices, std::vector<Segment>& segments, double x, double y, double length, double width, double height);
 
 private:
 
     bool mission(wasp_description::RequestMission::Request &req, wasp_description::RequestMission::Response& res);
 
-    mavros_msgs::Waypoint poseWaypoint(const Pose& pose, double acceptRadius = -1);
+    mavros_msgs::Waypoint poseWaypoint(const vec3& pose, double acceptRadius = -1);
     mavros_msgs::Waypoint speedWaypoint(double speed);
 
     double acceptanceRadius(double speed);
@@ -67,7 +53,8 @@ private:
 
     ros::ServiceServer m_MissionService;
 
-    std::vector<Pose> m_Path;
+    std::vector<vec3> m_Vertices;
+    std::vector<Segment> m_Segments;
 
     uint32_t m_Step;
 
@@ -79,7 +66,7 @@ private:
     double m_TargetSpeed;
     double m_LayerHeight;
     double m_AcceptRadius;
-    double zOffset;
+    double m_ZOffset;
 
     double ox = 47.39774;
     double oy = 8.54559;
